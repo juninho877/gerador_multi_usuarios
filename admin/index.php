@@ -7,27 +7,15 @@ if (!isset($_SESSION["usuario"])) {
 
 // Incluir funções necessárias para obter dados reais
 require_once 'includes/banner_functions.php';
-require_once 'classes/User.php';
+require_once 'classes/BannerStats.php';
 
 // Obter dados reais dos jogos
 $jogos = obterJogosDeHoje();
 $totalJogosHoje = count($jogos);
 
-// Obter estatísticas de usuários (se for admin)
-$userStats = null;
-if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-    try {
-        $user = new User();
-        $userStats = $user->getUserStats();
-    } catch (Exception $e) {
-        // Em caso de erro, usar valores padrão
-        $userStats = ['total' => 0, 'active' => 0, 'inactive' => 0, 'admins' => 0];
-    }
-}
-
-// Simular dados de banners gerados (pode ser implementado com uma tabela no futuro)
-$bannersGeradosHoje = rand(8, 25); // Simulação realística
-$totalBannersMes = rand(120, 300); // Simulação realística
+// Obter estatísticas reais de banners
+$bannerStats = new BannerStats();
+$userBannerStats = $bannerStats->getUserBannerStats($_SESSION['user_id']);
 
 $pageTitle = "Página Inicial";
 include "includes/header.php";
@@ -45,16 +33,16 @@ include "includes/header.php";
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-muted">Banners Gerados Hoje</p>
-                    <p class="text-2xl font-bold text-primary"><?php echo $bannersGeradosHoje; ?></p>
+                    <p class="text-2xl font-bold text-primary"><?php echo $userBannerStats['today_banners']; ?></p>
                 </div>
                 <div class="w-12 h-12 bg-primary-50 rounded-lg flex items-center justify-center">
                     <i class="fas fa-image text-primary-500"></i>
                 </div>
             </div>
             <div class="mt-2">
-                <span class="text-xs text-success-600 font-medium">
-                    <i class="fas fa-arrow-up mr-1"></i>
-                    +<?php echo rand(2, 8); ?> desde ontem
+                <span class="text-xs text-primary-600 font-medium">
+                    <i class="fas fa-calendar-day mr-1"></i>
+                    Hoje
                 </span>
             </div>
         </div>
@@ -92,7 +80,7 @@ include "includes/header.php";
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-muted">Total Este Mês</p>
-                    <p class="text-2xl font-bold text-warning-500"><?php echo $totalBannersMes; ?></p>
+                    <p class="text-2xl font-bold text-warning-500"><?php echo $userBannerStats['month_banners']; ?></p>
                 </div>
                 <div class="w-12 h-12 bg-warning-50 rounded-lg flex items-center justify-center">
                     <i class="fas fa-chart-line text-warning-500"></i>
@@ -111,75 +99,22 @@ include "includes/header.php";
         <div class="card-body">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm font-medium text-muted">Último Acesso</p>
-                    <p class="text-2xl font-bold text-info-500"><?php echo date('H:i'); ?></p>
+                    <p class="text-sm font-medium text-muted">Total Geral</p>
+                    <p class="text-2xl font-bold text-info-500"><?php echo $userBannerStats['total_banners']; ?></p>
                 </div>
                 <div class="w-12 h-12 bg-info-50 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-clock text-info-500"></i>
+                    <i class="fas fa-trophy text-info-500"></i>
                 </div>
             </div>
             <div class="mt-2">
                 <span class="text-xs text-info-600 font-medium">
-                    <i class="fas fa-calendar-day mr-1"></i>
-                    <?php echo date('d/m/Y'); ?>
+                    <i class="fas fa-star mr-1"></i>
+                    Todos os tempos
                 </span>
             </div>
         </div>
     </div>
 </div>
-
-<!-- Admin Stats (only for admins) -->
-<?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin' && $userStats): ?>
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-    <div class="card border-l-4 border-l-primary-500">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted">Total Usuários</p>
-                    <p class="text-xl font-bold text-primary"><?php echo $userStats['total']; ?></p>
-                </div>
-                <i class="fas fa-users text-primary-500 text-xl"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="card border-l-4 border-l-success-500">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted">Usuários Ativos</p>
-                    <p class="text-xl font-bold text-success-500"><?php echo $userStats['active']; ?></p>
-                </div>
-                <i class="fas fa-user-check text-success-500 text-xl"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="card border-l-4 border-l-danger-500">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted">Usuários Inativos</p>
-                    <p class="text-xl font-bold text-danger-500"><?php echo $userStats['inactive']; ?></p>
-                </div>
-                <i class="fas fa-user-times text-danger-500 text-xl"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="card border-l-4 border-l-warning-500">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted">Administradores</p>
-                    <p class="text-xl font-bold text-warning-500"><?php echo $userStats['admins']; ?></p>
-                </div>
-                <i class="fas fa-user-shield text-warning-500 text-xl"></i>
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
 
 <!-- Quick Actions -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -197,11 +132,6 @@ include "includes/header.php";
                 <a href="futbanner.php" class="btn btn-secondary">
                     <i class="fas fa-futbol"></i>
                     Gerar Banner Futebol
-                    <?php if ($totalJogosHoje > 0): ?>
-                        <span class="ml-auto bg-success-500 text-white text-xs px-2 py-1 rounded-full">
-                            <?php echo $totalJogosHoje; ?> jogos
-                        </span>
-                    <?php endif; ?>
                 </a>
                 <a href="setting.php" class="btn btn-secondary">
                     <i class="fas fa-cog"></i>
@@ -280,8 +210,8 @@ include "includes/header.php";
         
         <?php if ($totalJogosHoje > 6): ?>
             <div class="text-center mt-4">
-                <a href="futbanner.php" class="btn btn-primary">
-                    <i class="fas fa-futbol"></i>
+                <a href="jogos_hoje.php" class="btn btn-primary">
+                    <i class="fas fa-list"></i>
                     Ver Todos os <?php echo $totalJogosHoje; ?> Jogos
                 </a>
             </div>
@@ -320,6 +250,29 @@ include "includes/header.php";
             </div>
             <?php endif; ?>
             
+            <?php 
+            // Mostrar banners recentes
+            $recentBanners = $bannerStats->getRecentBanners($_SESSION['user_id'], 3);
+            foreach ($recentBanners as $banner): 
+                $bannerTypeText = $banner['banner_type'] === 'movie' ? 'Filme/Série' : 'Futebol';
+                $bannerIcon = $banner['banner_type'] === 'movie' ? 'fa-film' : 'fa-futbol';
+                $timeAgo = time() - strtotime($banner['generated_at']);
+                $timeText = $timeAgo < 3600 ? 'há ' . floor($timeAgo/60) . ' min' : 'há ' . floor($timeAgo/3600) . 'h';
+            ?>
+            <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                <div class="w-10 h-10 bg-info-100 rounded-full flex items-center justify-center">
+                    <i class="fas <?php echo $bannerIcon; ?> text-info-600 text-sm"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="font-medium">Banner <?php echo $bannerTypeText; ?> gerado</p>
+                    <p class="text-sm text-muted">
+                        <?php echo $banner['content_name'] ? htmlspecialchars($banner['content_name']) : 'Banner personalizado'; ?> - <?php echo $timeText; ?>
+                    </p>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            
+            <?php if (empty($recentBanners)): ?>
             <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
                 <div class="w-10 h-10 bg-info-100 rounded-full flex items-center justify-center">
                     <i class="fas fa-chart-line text-info-600 text-sm"></i>
@@ -329,6 +282,7 @@ include "includes/header.php";
                     <p class="text-sm text-muted">Dashboard com dados em tempo real</p>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -423,37 +377,7 @@ include "includes/header.php";
         justify-content: center;
     }
 
-    /* Bordas coloridas para cards admin */
-    .border-l-4 {
-        border-left-width: 4px;
-    }
-
-    .border-l-primary-500 {
-        border-left-color: var(--primary-500);
-    }
-
-    .border-l-success-500 {
-        border-left-color: var(--success-500);
-    }
-
-    .border-l-danger-500 {
-        border-left-color: var(--danger-500);
-    }
-
-    .border-l-warning-500 {
-        border-left-color: var(--warning-500);
-    }
-
     /* Utilitários */
-    .ml-auto {
-        margin-left: auto;
-    }
-
-    .text-xl {
-        font-size: 1.25rem;
-        line-height: 1.75rem;
-    }
-
     .text-info-500 {
         color: var(--info-500);
     }

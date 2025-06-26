@@ -43,6 +43,7 @@ if (in_array($action, ['view', 'download'])) {
 
 // Include necessary classes
 require_once 'classes/UserImage.php';
+require_once 'classes/BannerStats.php';
 
 $apiKey = 'ec8237f367023fbadd38ab6a1596b40c';
 $language = 'pt-BR';
@@ -381,6 +382,10 @@ try {
     if (!imagepng($image, $tempFilePath)) {
         throw new Exception("Erro ao salvar a imagem temporária");
     }
+    
+    // Registrar estatística do banner gerado
+    $bannerStats = new BannerStats();
+    $bannerStats->recordBannerGeneration($_SESSION['user_id'], 'movie', 'tema1', $nome);
     
     // Limpar memória
     imagedestroy($image);
