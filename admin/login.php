@@ -205,40 +205,69 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             align-items: center;
             gap: 0.5rem;
         }
+        
+        /* --- INÍCIO DAS ALTERAÇÕES NO CSS --- */
 
-        .form-input {
-            width: 100%;
-            padding: 1rem 1rem 1rem 3rem;
+        /* NOVO: Wrapper para alinhar ícone e input com Flexbox */
+        .input-wrapper {
+            display: flex;
+            align-items: center;
             border: 2px solid var(--border-color);
             border-radius: var(--border-radius);
-            font-size: 1rem;
-            transition: var(--transition);
             background: var(--bg-secondary);
-            color: var(--text-primary);
-            font-weight: 500;
+            transition: var(--transition);
+            position: relative;
         }
 
-        .form-input:focus {
-            outline: none;
+        /* NOVO: Efeito de foco no wrapper */
+        .input-wrapper:focus-within {
             border-color: var(--primary-500);
             background: var(--bg-primary);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-            transform: translateY(-1px);
         }
 
-        .input-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
+        /* ALTERADO: Input agora não tem mais borda ou padding próprio */
+        .form-input {
+            width: 100%;
+            flex-grow: 1;
+            padding: 1rem;
+            border: none;
+            background: transparent;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 500;
+            transition: var(--transition); /* Mantido para outras propriedades se houver */
+        }
+        
+        /* NOVO: Ícone da esquerda */
+        .input-icon-left {
+            padding-left: 1rem;
+            padding-right: 0.75rem;
             color: var(--text-muted);
-            margin-top: 0.875rem;
             transition: var(--transition);
         }
 
-        .form-input:focus + .input-icon {
+        /* NOVO: Muda cor do ícone da esquerda no foco */
+        .input-wrapper:focus-within .input-icon-left {
             color: var(--primary-500);
         }
+
+        /* NOVO: Ícone para mostrar/esconder senha (olho) */
+        .password-toggle-icon {
+            padding: 0 1rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .password-toggle-icon:hover {
+            color: var(--primary-500);
+        }
+
+        /* As classes antigas .input-icon e .form-input:focus podem ser removidas se existirem */
+
+        /* --- FIM DAS ALTERAÇÕES NO CSS --- */
+
 
         .submit-btn {
             width: 100%;
@@ -301,7 +330,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         [data-theme="dark"] .error-message {
             background: rgba(239, 68, 68, 0.1);
-            color: var(--danger-400);
+            color: var(--danger-500); /* Cor ajustada para melhor contraste no tema escuro */
         }
 
         .welcome-text {
@@ -377,10 +406,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             outline-offset: 2px;
         }
 
-        .form-input:focus {
-            outline: none;
-        }
-
         /* Loading state */
         .submit-btn.loading {
             pointer-events: none;
@@ -430,9 +455,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <i class="fas fa-user"></i>
                         Usuário
                     </label>
-                    <div style="position: relative;">
+                    <div class="input-wrapper">
+                        <i class="fas fa-user input-icon-left"></i>
                         <input type="text" id="username" name="username" class="form-input" placeholder="Digite seu usuário" required autocomplete="username">
-                        <i class="fas fa-user input-icon"></i>
                     </div>
                 </div>
 
@@ -441,9 +466,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <i class="fas fa-lock"></i>
                         Senha
                     </label>
-                    <div style="position: relative;">
+                    <div class="input-wrapper">
+                        <i class="fas fa-lock input-icon-left"></i>
                         <input type="password" id="password" name="password" class="form-input" placeholder="Digite sua senha" required autocomplete="current-password">
-                        <i class="fas fa-lock input-icon"></i>
+                        <i class="fas fa-eye password-toggle-icon" id="togglePassword"></i>
                     </div>
                 </div>
 
@@ -459,7 +485,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                 <?php endif; ?>
             </form>
-        </div>
+            </div>
     </div>
 
     <script>
@@ -491,27 +517,59 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const submitBtn = document.getElementById('submitBtn');
         const inputs = document.querySelectorAll('.form-input');
 
-        // Input focus animations
+        // Input focus animations (mantido como estava)
         inputs.forEach(input => {
             input.addEventListener('focus', function() {
-                this.parentElement.style.transform = 'scale(1.02)';
+                // Animação agora é controlada pelo :focus-within no CSS, mas pode deixar para outras lógicas se quiser
             });
             
             input.addEventListener('blur', function() {
-                this.parentElement.style.transform = 'scale(1)';
+                 // Animação agora é controlada pelo CSS
             });
         });
 
         // Form submission with loading state
         loginForm.addEventListener('submit', function(e) {
             submitBtn.classList.add('loading');
-            submitBtn.textContent = 'Entrando...';
+            
+            // Para não remover o ícone do botão, vamos envolvê-lo num span
+            const btnText = submitBtn.querySelector('span');
+            if(!btnText) { // Adiciona o span se não existir, para o código funcionar
+                submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i><span>${submitBtn.textContent.trim()}</span>`
+            }
+            submitBtn.querySelector('span').textContent = ' Entrando...';
         });
 
-        // Auto-focus on first input
+        // --- INÍCIO DO NOVO SCRIPT PARA VER SENHA E FOCO ---
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('username').focus();
+            // Lógica para mostrar/esconder senha
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+
+            if (togglePassword && passwordInput) {
+                togglePassword.addEventListener('click', function() {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+
+                    // Troca o ícone (olho aberto / olho fechado)
+                    this.classList.toggle('fa-eye');
+                    this.classList.toggle('fa-eye-slash');
+                });
+            }
+
+            // Auto-focus no campo de usuário
+            const usernameInput = document.getElementById('username');
+            if (usernameInput) {
+                usernameInput.focus();
+            }
+
+            // Ajuste para o texto do botão no loading state
+            const btnTextSpan = document.createElement('span');
+            btnTextSpan.textContent = ' Entrar no Sistema';
+            submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i>';
+            submitBtn.appendChild(btnTextSpan);
         });
+        // --- FIM DO NOVO SCRIPT ---
 
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
