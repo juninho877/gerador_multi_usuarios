@@ -36,7 +36,8 @@ class BannerCache {
             UNIQUE KEY unique_user_cache (user_id, cache_key),
             FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE,
             INDEX idx_expires (expires_at),
-            INDEX idx_user_type (user_id, banner_type)
+            INDEX idx_user_type (user_id, banner_type),
+            INDEX idx_created_date (DATE(created_at))
         );
         ";
         
@@ -48,28 +49,66 @@ class BannerCache {
     }
     
     /**
-     * Gerar chave de cache baseada nos jogos e configurações do usuário
+     * 🔧 MELHORADA: Gerar chave de cache mais específica e estável
      */
     public function generateCacheKey($userId, $bannerType, $grupoIndex, $jogos) {
-        // Criar hash baseado nos dados dos jogos e configurações do usuário
+        // Incluir configurações do usuário na chave para invalidar quando mudarem
+        $userConfigHash = $this->getUserConfigHash($userId);
+        
+        // Criar hash mais específico dos jogos (apenas dados relevantes)
+        $jogosRelevantes = [];
+        foreach ($jogos as $jogo) {
+            $jogosRelevantes[] = [
+                'time1' => $jogo['time1'] ?? '',
+                'time2' => $jogo['time2'] ?? '',
+                'horario' => $jogo['horario'] ?? '',
+                'competicao' => $jogo['competicao'] ?? '',
+                'placar_time1' => $jogo['placar_time1'] ?? '',
+                'placar_time2' => $jogo['placar_time2'] ?? '',
+                'status' => $jogo['status'] ?? ''
+            ];
+        }
+        
         $dataString = serialize([
             'user_id' => $userId,
             'banner_type' => $bannerType,
             'grupo_index' => $grupoIndex,
-            'jogos_hash' => md5(serialize($jogos)),
-            'date' => date('Y-m-d') // Incluir data para invalidar cache diário
+            'jogos_hash' => md5(serialize($jogosRelevantes)),
+            'user_config' => $userConfigHash,
+            'date' => date('Y-m-d'), // Cache válido apenas para o dia atual
+            'version' => '2.0' // Versão do cache para forçar regeneração quando necessário
         ]);
         
         return md5($dataString);
     }
     
     /**
-     * Verificar se existe cache válido
+     * 🆕 Obter hash das configurações do usuário (logos, fundos, cards)
+     */
+    private function getUserConfigHash($userId) {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT image_key, image_path, upload_type, updated_at
+                FROM user_images 
+                WHERE user_id = ? 
+                ORDER BY image_key
+            ");
+            $stmt->execute([$userId]);
+            $configs = $stmt->fetchAll();
+            
+            return md5(serialize($configs));
+        } catch (Exception $e) {
+            return 'default';
+        }
+    }
+    
+    /**
+     * 🔧 MELHORADA: Verificar cache com validação mais rigorosa
      */
     public function getCachedBanner($userId, $cacheKey) {
         try {
             $stmt = $this->db->prepare("
-                SELECT file_path, original_name, created_at
+                SELECT file_path, original_name, created_at, expires_at
                 FROM banner_cache 
                 WHERE user_id = ? AND cache_key = ? AND expires_at > NOW()
             ");
@@ -77,10 +116,14 @@ class BannerCache {
             $result = $stmt->fetch();
             
             if ($result && file_exists($result['file_path'])) {
-                return $result;
+                // Verificar se o arquivo não está corrompido
+                $fileSize = filesize($result['file_path']);
+                if ($fileSize > 1000) { // Arquivo deve ter pelo menos 1KB
+                    return $result;
+                }
             }
             
-            // Se não existe ou arquivo foi removido, limpar do banco
+            // Se não existe, está corrompido ou arquivo foi removido, limpar do banco
             if ($result) {
                 $this->removeCachedBanner($userId, $cacheKey);
             }
@@ -93,16 +136,22 @@ class BannerCache {
     }
     
     /**
-     * Salvar banner no cache
+     * 🔧 MELHORADA: Salvar banner no cache com validação
      */
     public function saveBannerToCache($userId, $cacheKey, $imageResource, $bannerType, $grupoIndex = null, $originalName = null) {
         try {
             // Gerar nome único para o arquivo
-            $fileName = 'banner_' . $bannerType . '_' . $userId . '_' . $cacheKey . '.png';
+            $fileName = 'banner_' . $bannerType . '_' . $userId . '_' . substr($cacheKey, 0, 8) . '_' . time() . '.png';
             $filePath = $this->cacheDir . $fileName;
             
             // Salvar imagem
-            if (!imagepng($imageResource, $filePath)) {
+            if (!imagepng($imageResource, $filePath, 6)) { // Compressão 6 para equilibrar qualidade/tamanho
+                return false;
+            }
+            
+            // Verificar se o arquivo foi criado corretamente
+            if (!file_exists($filePath) || filesize($filePath) < 1000) {
+                if (file_exists($filePath)) unlink($filePath);
                 return false;
             }
             
@@ -114,12 +163,16 @@ class BannerCache {
                 }
             }
             
-            // Expiração: 6 horas
-            $expiresAt = date('Y-m-d H:i:s', time() + (6 * 3600));
+            // 🔧 AJUSTADO: Expiração até às 00h do próximo dia (quando os jogos mudam)
+            $tomorrow = new DateTime('tomorrow');
+            $expiresAt = $tomorrow->format('Y-m-d H:i:s');
             
-            // Salvar no banco (usar REPLACE para atualizar se já existir)
+            // Remover cache anterior se existir
+            $this->removeCachedBanner($userId, $cacheKey);
+            
+            // Salvar no banco
             $stmt = $this->db->prepare("
-                REPLACE INTO banner_cache (user_id, cache_key, file_path, original_name, banner_type, grupo_index, expires_at) 
+                INSERT INTO banner_cache (user_id, cache_key, file_path, original_name, banner_type, grupo_index, expires_at) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([$userId, $cacheKey, $filePath, $originalName, $bannerType, $grupoIndex, $expiresAt]);
@@ -131,6 +184,10 @@ class BannerCache {
             ];
         } catch (Exception $e) {
             error_log("Erro ao salvar cache: " . $e->getMessage());
+            // Limpar arquivo se foi criado mas houve erro no banco
+            if (isset($filePath) && file_exists($filePath)) {
+                unlink($filePath);
+            }
             return false;
         }
     }
@@ -167,7 +224,7 @@ class BannerCache {
     }
     
     /**
-     * Limpar cache expirado
+     * 🔧 MELHORADA: Limpar cache expirado e órfãos
      */
     public function cleanExpiredCache() {
         try {
@@ -181,8 +238,119 @@ class BannerCache {
             
             $removedCount = 0;
             
-            // Remover arquivos físicos
+            // Remover arquivos físicos expirados
             foreach ($expiredFiles as $file) {
+                if (file_exists($file['file_path'])) {
+                    if (unlink($file['file_path'])) {
+                        $removedCount++;
+                    }
+                }
+            }
+            
+            // Remover registros expirados do banco
+            $stmt = $this->db->prepare("
+                DELETE FROM banner_cache 
+                WHERE expires_at <= NOW()
+            ");
+            $stmt->execute();
+            
+            // 🆕 LIMPAR ARQUIVOS ÓRFÃOS (arquivos que existem mas não estão no banco)
+            $orphanCount = $this->cleanOrphanFiles();
+            
+            return $removedCount + $orphanCount;
+        } catch (Exception $e) {
+            error_log("Erro ao limpar cache: " . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    /**
+     * 🆕 Limpar arquivos órfãos do diretório de cache
+     */
+    private function cleanOrphanFiles() {
+        try {
+            if (!is_dir($this->cacheDir)) {
+                return 0;
+            }
+            
+            // Obter todos os arquivos válidos do banco
+            $stmt = $this->db->prepare("SELECT file_path FROM banner_cache");
+            $stmt->execute();
+            $validFiles = array_column($stmt->fetchAll(), 'file_path');
+            $validFilesSet = array_flip($validFiles);
+            
+            $orphanCount = 0;
+            $files = glob($this->cacheDir . 'banner_*.png');
+            
+            foreach ($files as $file) {
+                if (!isset($validFilesSet[$file])) {
+                    // Arquivo órfão - não está no banco
+                    if (unlink($file)) {
+                        $orphanCount++;
+                    }
+                }
+            }
+            
+            return $orphanCount;
+        } catch (Exception $e) {
+            error_log("Erro ao limpar arquivos órfãos: " . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    /**
+     * 🆕 LIMPEZA DIÁRIA COMPLETA (para ser executada às 00h)
+     */
+    public function dailyCleanup() {
+        try {
+            $totalRemoved = 0;
+            
+            // 1. Limpar cache expirado
+            $expiredRemoved = $this->cleanExpiredCache();
+            $totalRemoved += $expiredRemoved;
+            
+            // 2. Limpar cache de ontem (forçar regeneração com jogos de hoje)
+            $yesterdayRemoved = $this->cleanYesterdayCache();
+            $totalRemoved += $yesterdayRemoved;
+            
+            // 3. Limpar arquivos muito antigos (mais de 7 dias)
+            $oldRemoved = $this->cleanOldFiles();
+            $totalRemoved += $oldRemoved;
+            
+            error_log("🧹 LIMPEZA DIÁRIA COMPLETA - Total removido: {$totalRemoved} arquivos");
+            
+            return [
+                'total_removed' => $totalRemoved,
+                'expired_removed' => $expiredRemoved,
+                'yesterday_removed' => $yesterdayRemoved,
+                'old_removed' => $oldRemoved,
+                'timestamp' => date('Y-m-d H:i:s')
+            ];
+        } catch (Exception $e) {
+            error_log("❌ Erro na limpeza diária: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * 🆕 Limpar cache de ontem
+     */
+    private function cleanYesterdayCache() {
+        try {
+            $yesterday = date('Y-m-d', strtotime('-1 day'));
+            
+            // Buscar arquivos de ontem
+            $stmt = $this->db->prepare("
+                SELECT file_path FROM banner_cache 
+                WHERE DATE(created_at) = ?
+            ");
+            $stmt->execute([$yesterday]);
+            $yesterdayFiles = $stmt->fetchAll();
+            
+            $removedCount = 0;
+            
+            // Remover arquivos físicos
+            foreach ($yesterdayFiles as $file) {
                 if (file_exists($file['file_path'])) {
                     if (unlink($file['file_path'])) {
                         $removedCount++;
@@ -193,13 +361,53 @@ class BannerCache {
             // Remover registros do banco
             $stmt = $this->db->prepare("
                 DELETE FROM banner_cache 
-                WHERE expires_at <= NOW()
+                WHERE DATE(created_at) = ?
             ");
-            $stmt->execute();
+            $stmt->execute([$yesterday]);
             
             return $removedCount;
         } catch (Exception $e) {
-            error_log("Erro ao limpar cache: " . $e->getMessage());
+            error_log("Erro ao limpar cache de ontem: " . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    /**
+     * 🆕 Limpar arquivos muito antigos
+     */
+    private function cleanOldFiles() {
+        try {
+            $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
+            
+            // Buscar arquivos antigos
+            $stmt = $this->db->prepare("
+                SELECT file_path FROM banner_cache 
+                WHERE DATE(created_at) < ?
+            ");
+            $stmt->execute([$sevenDaysAgo]);
+            $oldFiles = $stmt->fetchAll();
+            
+            $removedCount = 0;
+            
+            // Remover arquivos físicos
+            foreach ($oldFiles as $file) {
+                if (file_exists($file['file_path'])) {
+                    if (unlink($file['file_path'])) {
+                        $removedCount++;
+                    }
+                }
+            }
+            
+            // Remover registros do banco
+            $stmt = $this->db->prepare("
+                DELETE FROM banner_cache 
+                WHERE DATE(created_at) < ?
+            ");
+            $stmt->execute([$sevenDaysAgo]);
+            
+            return $removedCount;
+        } catch (Exception $e) {
+            error_log("Erro ao limpar arquivos antigos: " . $e->getMessage());
             return 0;
         }
     }
@@ -227,7 +435,7 @@ class BannerCache {
                 if (file_exists($file['file_path'])) {
                     if (unlink($file['file_path'])) {
                         $removedCount++;
-                        error_log("🗑️ Arquivo removido: " . $file['file_path']);
+                        error_log("🗑️ Arquivo removido: " . basename($file['file_path']));
                     }
                 }
             }
@@ -250,7 +458,7 @@ class BannerCache {
     }
     
     /**
-     * Obter estatísticas do cache
+     * 🔧 MELHORADA: Obter estatísticas do cache
      */
     public function getCacheStats($userId = null) {
         try {
@@ -259,7 +467,14 @@ class BannerCache {
                     SELECT 
                         COUNT(*) as total_cached,
                         COUNT(CASE WHEN expires_at > NOW() THEN 1 END) as valid_cached,
-                        COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_cached
+                        COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_cached,
+                        ROUND(SUM(
+                            CASE 
+                                WHEN file_path IS NOT NULL AND file_path != '' 
+                                THEN (SELECT COALESCE(LENGTH(LOAD_FILE(file_path)), 0))
+                                ELSE 0 
+                            END
+                        ) / 1024 / 1024, 2) as total_size_mb
                     FROM banner_cache 
                     WHERE user_id = ?
                 ");
@@ -270,7 +485,14 @@ class BannerCache {
                         COUNT(*) as total_cached,
                         COUNT(CASE WHEN expires_at > NOW() THEN 1 END) as valid_cached,
                         COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_cached,
-                        COUNT(DISTINCT user_id) as users_with_cache
+                        COUNT(DISTINCT user_id) as users_with_cache,
+                        ROUND(SUM(
+                            CASE 
+                                WHEN file_path IS NOT NULL AND file_path != '' 
+                                THEN (SELECT COALESCE(LENGTH(LOAD_FILE(file_path)), 0))
+                                ELSE 0 
+                            END
+                        ) / 1024 / 1024, 2) as total_size_mb
                     FROM banner_cache
                 ");
                 $stmt->execute();
