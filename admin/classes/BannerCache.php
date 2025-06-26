@@ -309,9 +309,9 @@ class BannerCache {
             $expiredRemoved = $this->cleanExpiredCache();
             $totalRemoved += $expiredRemoved;
             
-            // 2. Limpar cache de ontem (forçar regeneração com jogos de hoje)
-            $yesterdayRemoved = $this->cleanYesterdayCache();
-            $totalRemoved += $yesterdayRemoved;
+            // 2. 🔥 FORÇAR LIMPEZA DE TODOS OS CACHES (já que os jogos mudaram)
+            $allCacheRemoved = $this->forceCleanAllCache();
+            $totalRemoved += $allCacheRemoved;
             
             // 3. Limpar arquivos muito antigos (mais de 7 dias)
             $oldRemoved = $this->cleanOldFiles();
@@ -322,7 +322,7 @@ class BannerCache {
             return [
                 'total_removed' => $totalRemoved,
                 'expired_removed' => $expiredRemoved,
-                'yesterday_removed' => $yesterdayRemoved,
+                'all_cache_removed' => $allCacheRemoved,
                 'old_removed' => $oldRemoved,
                 'timestamp' => date('Y-m-d H:i:s')
             ];
@@ -333,24 +333,19 @@ class BannerCache {
     }
     
     /**
-     * 🆕 Limpar cache de ontem
+     * 🆕 FORÇAR LIMPEZA DE TODO CACHE (para limpeza diária às 00h)
      */
-    private function cleanYesterdayCache() {
+    private function forceCleanAllCache() {
         try {
-            $yesterday = date('Y-m-d', strtotime('-1 day'));
-            
-            // Buscar arquivos de ontem
-            $stmt = $this->db->prepare("
-                SELECT file_path FROM banner_cache 
-                WHERE DATE(created_at) = ?
-            ");
-            $stmt->execute([$yesterday]);
-            $yesterdayFiles = $stmt->fetchAll();
+            // Buscar TODOS os arquivos de cache
+            $stmt = $this->db->prepare("SELECT file_path FROM banner_cache");
+            $stmt->execute();
+            $allFiles = $stmt->fetchAll();
             
             $removedCount = 0;
             
-            // Remover arquivos físicos
-            foreach ($yesterdayFiles as $file) {
+            // Remover TODOS os arquivos físicos
+            foreach ($allFiles as $file) {
                 if (file_exists($file['file_path'])) {
                     if (unlink($file['file_path'])) {
                         $removedCount++;
@@ -358,16 +353,15 @@ class BannerCache {
                 }
             }
             
-            // Remover registros do banco
-            $stmt = $this->db->prepare("
-                DELETE FROM banner_cache 
-                WHERE DATE(created_at) = ?
-            ");
-            $stmt->execute([$yesterday]);
+            // Limpar TODA a tabela de cache
+            $stmt = $this->db->prepare("DELETE FROM banner_cache");
+            $stmt->execute();
+            
+            error_log("🔥 LIMPEZA FORÇADA - Removidos: {$removedCount} arquivos de cache");
             
             return $removedCount;
         } catch (Exception $e) {
-            error_log("Erro ao limpar cache de ontem: " . $e->getMessage());
+            error_log("Erro na limpeza forçada: " . $e->getMessage());
             return 0;
         }
     }
@@ -467,14 +461,7 @@ class BannerCache {
                     SELECT 
                         COUNT(*) as total_cached,
                         COUNT(CASE WHEN expires_at > NOW() THEN 1 END) as valid_cached,
-                        COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_cached,
-                        ROUND(SUM(
-                            CASE 
-                                WHEN file_path IS NOT NULL AND file_path != '' 
-                                THEN (SELECT COALESCE(LENGTH(LOAD_FILE(file_path)), 0))
-                                ELSE 0 
-                            END
-                        ) / 1024 / 1024, 2) as total_size_mb
+                        COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_cached
                     FROM banner_cache 
                     WHERE user_id = ?
                 ");
@@ -485,20 +472,28 @@ class BannerCache {
                         COUNT(*) as total_cached,
                         COUNT(CASE WHEN expires_at > NOW() THEN 1 END) as valid_cached,
                         COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_cached,
-                        COUNT(DISTINCT user_id) as users_with_cache,
-                        ROUND(SUM(
-                            CASE 
-                                WHEN file_path IS NOT NULL AND file_path != '' 
-                                THEN (SELECT COALESCE(LENGTH(LOAD_FILE(file_path)), 0))
-                                ELSE 0 
-                            END
-                        ) / 1024 / 1024, 2) as total_size_mb
+                        COUNT(DISTINCT user_id) as users_with_cache
                     FROM banner_cache
                 ");
                 $stmt->execute();
             }
             
-            return $stmt->fetch();
+            $stats = $stmt->fetch();
+            
+            // Calcular tamanho total dos arquivos
+            $totalSize = 0;
+            if (is_dir($this->cacheDir)) {
+                $files = glob($this->cacheDir . 'banner_*.png');
+                foreach ($files as $file) {
+                    if (file_exists($file)) {
+                        $totalSize += filesize($file);
+                    }
+                }
+            }
+            
+            $stats['total_size_mb'] = round($totalSize / 1024 / 1024, 2);
+            
+            return $stats;
         } catch (Exception $e) {
             error_log("Erro ao obter estatísticas do cache: " . $e->getMessage());
             return false;

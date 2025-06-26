@@ -31,7 +31,12 @@ try {
     $currentHour = (int)date('H');
     $isDailyCleanup = $isCLI && $currentHour === 0; // Limpeza diária às 00h via cron
     
-    if ($isDailyCleanup || (isset($_GET['daily']) && $_GET['daily'] === '1')) {
+    // 🔥 FORÇAR LIMPEZA DIÁRIA se solicitado via parâmetro
+    if (isset($_GET['daily']) && $_GET['daily'] === '1') {
+        $isDailyCleanup = true;
+    }
+    
+    if ($isDailyCleanup) {
         // 🧹 LIMPEZA DIÁRIA COMPLETA
         error_log("🧹 INICIANDO LIMPEZA DIÁRIA COMPLETA DO CACHE - " . date('Y-m-d H:i:s'));
         
@@ -82,7 +87,7 @@ try {
             echo "Detalhes:\n";
             echo "  - Total removido: " . $response['details']['total_removed'] . " arquivos\n";
             echo "  - Expirados: " . $response['details']['expired_removed'] . "\n";
-            echo "  - De ontem: " . $response['details']['yesterday_removed'] . "\n";
+            echo "  - Todo cache: " . $response['details']['all_cache_removed'] . "\n";
             echo "  - Antigos: " . $response['details']['old_removed'] . "\n";
         } else {
             echo "Arquivos removidos: " . $response['removed_files'] . "\n";

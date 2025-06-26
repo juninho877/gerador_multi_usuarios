@@ -366,7 +366,7 @@ function testCleanup(type) {
                             <strong>Detalhes:</strong><br>
                             • Total removido: ${data.details.total_removed} arquivos<br>
                             • Expirados: ${data.details.expired_removed}<br>
-                            • De ontem: ${data.details.yesterday_removed}<br>
+                            • Todo cache: ${data.details.all_cache_removed}<br>
                             • Antigos: ${data.details.old_removed}
                         </div>
                     `;
