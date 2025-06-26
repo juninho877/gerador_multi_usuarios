@@ -707,7 +707,7 @@ try {
                                 <img src="https://i.ibb.co/MJCWzXj/8966-media-3.png" alt="Tema 1" loading="lazy">
                             </div>
                             <h3 class="theme-name">Tema Clássico</h3>
-                            <p class="theme-description">Design elegante e profissional com layout vertical</p>
+                            <p class="theme-description">Tema 1 Descrição</p>
                             <button class="theme-select-btn" onclick="generateBanner(1, '${encodeURIComponent(JSON.stringify(movieData))}')">
                                 <i class="fas fa-check"></i>
                                 Selecionar Tema
@@ -720,7 +720,7 @@ try {
                                 <img src="https://i.ibb.co/6R7F9Y09/8966-media-2.png" alt="Tema 2" loading="lazy">
                             </div>
                             <h3 class="theme-name">Tema Moderno</h3>
-                            <p class="theme-description">Layout horizontal com elementos dinâmicos</p>
+                            <p class="theme-description">Tema 2 Descrição</p>
                             <button class="theme-select-btn" onclick="generateBanner(2, '${encodeURIComponent(JSON.stringify(movieData))}')">
                                 <i class="fas fa-check"></i>
                                 Selecionar Tema
@@ -733,7 +733,7 @@ try {
                                 <img src="https://i.ibb.co/x8PCQM3r/8966-media-1.png" alt="Tema 3" loading="lazy">
                             </div>
                             <h3 class="theme-name">Tema Premium</h3>
-                            <p class="theme-description">Design sofisticado com cantos arredondados</p>
+                            <p class="theme-description">Tema 3 Descrição</p>
                             <button class="theme-select-btn" onclick="generateBanner(3, '${encodeURIComponent(JSON.stringify(movieData))}')">
                                 <i class="fas fa-check"></i>
                                 Selecionar Tema
