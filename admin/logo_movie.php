@@ -70,6 +70,33 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
     } else {
         $errorMessage = "Tipo de logo inválido enviado.";
     }
+    
+    // CORREÇÃO: Redirecionar após POST para evitar reenvio
+    if (!empty($successMessage) || !empty($errorMessage)) {
+        $message = !empty($successMessage) ? $successMessage : $errorMessage;
+        $type = !empty($successMessage) ? 'success' : 'error';
+        
+        // Usar sessão para passar a mensagem
+        $_SESSION['flash_message'] = $message;
+        $_SESSION['flash_type'] = $type;
+        
+        // Redirecionar para a mesma página (GET)
+        header("Location: logo_movie.php");
+        exit();
+    }
+}
+
+// Verificar se há mensagem flash da sessão
+if (isset($_SESSION['flash_message'])) {
+    if ($_SESSION['flash_type'] === 'success') {
+        $successMessage = $_SESSION['flash_message'];
+    } else {
+        $errorMessage = $_SESSION['flash_message'];
+    }
+    
+    // Limpar mensagem da sessão
+    unset($_SESSION['flash_message']);
+    unset($_SESSION['flash_type']);
 }
 
 // Buscar configuração atual do logo
@@ -457,8 +484,6 @@ document.addEventListener('DOMContentLoaded', function() {
         background: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
         color: document.body.getAttribute('data-theme') === 'dark' ? '#f1f5f9' : '#1e293b',
         confirmButtonColor: '#3b82f6'
-    }).then(() => {
-        window.location.reload();
     });
     <?php elseif (!empty($errorMessage)): ?>
     Swal.fire({
