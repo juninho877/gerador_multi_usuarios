@@ -15,6 +15,7 @@ if (!isset($_SESSION["usuario"])) {
 }
 
 require_once 'includes/banner_functions.php';
+require_once 'classes/BannerStats.php';
 
 function gerarBanner($im, $jogos, $grupoJogos, $padding, $heightPorJogo, $width, $preto, $branco, $fontLiga) {
     static $fundoJogo = null;
@@ -153,6 +154,10 @@ $espacoExtra = 200;
 $fontLiga = __DIR__ . '/fonts/MANDATOR.ttf';
 
 if (isset($_GET['download_all']) && $_GET['download_all'] == 1) {
+    // Registrar estatística para download de todos os banners
+    $bannerStats = new BannerStats();
+    $bannerStats->recordBannerGeneration($_SESSION['user_id'], 'football', 'tema2_all', 'Banners Futebol V2 - Todos');
+    
     $zip = new ZipArchive();
     $zipNome = "banners_Top_V3_" . date('Y-m-d') . ".zip";
     $caminhoTempZip = sys_get_temp_dir() . '/' . uniqid('banners_V3_') . '.zip';
@@ -217,6 +222,10 @@ if (!isset($gruposDeJogos[$grupoIndex])) {
     imagestring($im, 5, 10, 40, "Banner inválido.", $color);
     imagepng($im); imagedestroy($im); exit;
 }
+
+// Registrar estatística para banner individual
+$bannerStats = new BannerStats();
+$bannerStats->recordBannerGeneration($_SESSION['user_id'], 'football', 'tema2', 'Banner Futebol V2 - Parte ' . ($grupoIndex + 1));
 
 $grupoJogos = $gruposDeJogos[$grupoIndex];
 $numJogosNesteBanner = count($grupoJogos);

@@ -43,6 +43,7 @@ if (in_array($action, ['view', 'download'])) {
 
 // Include necessary classes
 require_once 'classes/UserImage.php';
+require_once 'classes/BannerStats.php';
 
 // Configuração da API
 $apiKey = 'ec8237f367023fbadd38ab6a1596b40c';
@@ -431,6 +432,10 @@ try {
     $maxWidth = $imageWidth - 460;
     $wrappedSinopse = wrapText($sinopse, $fontPath, $fontSize, $maxWidth);
     imagettftext($image, $fontSize, 0, 445, 390, $whiteColor, $fontPath, $wrappedSinopse);
+
+    // Registrar estatística do banner gerado
+    $bannerStats = new BannerStats();
+    $bannerStats->recordBannerGeneration($_SESSION['user_id'], 'movie', 'tema3', $nome);
 
     // Gerar nome de arquivo temporário único
     $tempFileName = 'banner_tema3_' . uniqid() . '_' . time() . '.png';

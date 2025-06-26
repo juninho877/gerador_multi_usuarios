@@ -15,6 +15,7 @@ if (!isset($_SESSION["usuario"])) {
 }
 
 require_once 'includes/banner_functions.php';
+require_once 'classes/BannerStats.php';
 
 function gerarBanner($im, $jogos, $grupoJogos, $padding, $heightPorJogo, $width, $preto, $branco, $fontLiga) {
     // Cache para imagens estáticas
@@ -186,6 +187,10 @@ $gruposDeJogos = array_chunk(array_keys($jogos), $jogosPorBanner);
 
 // Download de todos os banners
 if (isset($_GET['download_all']) && $_GET['download_all'] == 1) {
+    // Registrar estatística para download de todos os banners
+    $bannerStats = new BannerStats();
+    $bannerStats->recordBannerGeneration($_SESSION['user_id'], 'football', 'tema1_all', 'Banners Futebol - Todos');
+    
     $zip = new ZipArchive();
     $zipNome = "banners_topplay_" . date('Y-m-d') . ".zip";
     $caminhoTempZip = sys_get_temp_dir() . '/' . uniqid('banners_') . '.zip';
@@ -251,6 +256,10 @@ if (isset($_GET['download_all']) && $_GET['download_all'] == 1) {
         imagedestroy($im);
         exit;
     }
+
+    // Registrar estatística para banner individual
+    $bannerStats = new BannerStats();
+    $bannerStats->recordBannerGeneration($_SESSION['user_id'], 'football', 'tema1', 'Banner Futebol - Parte ' . ($grupoIndex + 1));
 
     $grupoJogos = $gruposDeJogos[$grupoIndex];
     $numJogosNesteBanner = count($grupoJogos);

@@ -43,6 +43,7 @@ if (in_array($action, ['view', 'download'])) {
 
 // Include necessary classes
 require_once 'classes/UserImage.php';
+require_once 'classes/BannerStats.php';
 
 $apiKey = 'ec8237f367023fbadd38ab6a1596b40c';
 $language = 'pt-BR';
@@ -375,6 +376,10 @@ try {
     
     imagettftext($image, 20, 0, 215, $imageHeight - 30, $whiteColor, $fontPath, "O MELHOR DO STREAMING VOCÊ SÓ ENCONTRA AQUI");
     imagettftext($image, 16, 0, 445, $imageHeight - 180, $whiteColor, $fontPath, "DISPONÍVEL EM DIVERSOS APARELHOS");
+    
+    // Registrar estatística do banner gerado
+    $bannerStats = new BannerStats();
+    $bannerStats->recordBannerGeneration($_SESSION['user_id'], 'movie', 'tema2', $nome);
     
     // Gerar nome de arquivo temporário único
     $tempFileName = 'banner_tema2_' . uniqid() . '_' . time() . '.png';
