@@ -7,8 +7,10 @@ if (!isset($_SESSION["usuario"])) {
 
 // Incluir classes necessárias
 require_once 'classes/UserImage.php';
+require_once 'classes/BannerCache.php';
 
 $userImage = new UserImage();
+$bannerCache = new BannerCache();
 $userId = $_SESSION['user_id'];
 
 $logo_types = [
@@ -39,7 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
                 if (move_uploaded_file($file['tmp_name'], $destination)) {
                     $imagePath = "fzstore/logo/" . $fileName;
                     if ($userImage->saveUserImage($userId, $posted_logo_type, $imagePath, 'file')) {
-                        $successMessage = "Logo para banners de filmes/séries atualizado com sucesso!";
+                        // 🔥 INVALIDAR CACHE AUTOMATICAMENTE
+                        $removedCount = $bannerCache->clearUserCache($userId);
+                        
+                        $successMessage = "Logo para banners de filmes/séries atualizado com sucesso! Cache de banners limpo automaticamente ({$removedCount} arquivos removidos).";
                     } else {
                         $errorMessage = "Erro ao salvar as informações do logo.";
                     }
@@ -53,7 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
             $imageUrl = filter_var($_POST['image-url'], FILTER_SANITIZE_URL);
             if (filter_var($imageUrl, FILTER_VALIDATE_URL)) {
                 if ($userImage->saveUserImage($userId, $posted_logo_type, $imageUrl, 'url')) {
-                    $successMessage = "Logo para banners de filmes/séries atualizado com sucesso!";
+                    // 🔥 INVALIDAR CACHE AUTOMATICAMENTE
+                    $removedCount = $bannerCache->clearUserCache($userId);
+                    
+                    $successMessage = "Logo para banners de filmes/séries atualizado com sucesso! Cache de banners limpo automaticamente ({$removedCount} arquivos removidos).";
                 } else {
                     $errorMessage = "Erro ao salvar as informações do logo.";
                 }
@@ -62,7 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
             }
         } elseif (isset($_POST['default-logo'])) {
             if ($userImage->saveUserImage($userId, $posted_logo_type, "imgelementos/semlogo.png", 'default')) {
-                $successMessage = "Logo padrão restaurado com sucesso!";
+                // 🔥 INVALIDAR CACHE AUTOMATICAMENTE
+                $removedCount = $bannerCache->clearUserCache($userId);
+                
+                $successMessage = "Logo padrão restaurado com sucesso! Cache de banners limpo automaticamente ({$removedCount} arquivos removidos).";
             } else {
                 $errorMessage = "Erro ao restaurar logo padrão.";
             }
@@ -230,6 +241,30 @@ include "includes/header.php";
         </div>
     </div>
 </div>
+
+<!-- Cache Info Alert -->
+<?php if (!empty($successMessage) && strpos($successMessage, 'Cache') !== false): ?>
+<div class="card mt-6 border-success-200">
+    <div class="card-header">
+        <h3 class="card-title text-success-600">
+            <i class="fas fa-rocket text-success-500 mr-2"></i>
+            Cache Atualizado Automaticamente
+        </h3>
+    </div>
+    <div class="card-body">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-info-circle text-success-500 mt-1"></i>
+            <div>
+                <p class="font-medium text-success-700">Seus próximos banners usarão o novo logo!</p>
+                <p class="text-sm text-success-600 mt-1">
+                    O cache foi limpo automaticamente. Os próximos banners de filmes e séries que você gerar 
+                    já utilizarão o logo atualizado.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Info Section -->
 <div class="card mt-6">
@@ -429,6 +464,22 @@ include "includes/header.php";
         gap: 1.5rem;
     }
 
+    .border-success-200 {
+        border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    .text-success-600 {
+        color: var(--success-600);
+    }
+
+    .text-success-700 {
+        color: var(--success-700);
+    }
+
+    .mt-1 {
+        margin-top: 0.25rem;
+    }
+
     @keyframes fadeIn {
         from {
             opacity: 0;
@@ -451,6 +502,18 @@ include "includes/header.php";
 
     [data-theme="dark"] .text-gray-500 {
         color: var(--text-muted);
+    }
+
+    [data-theme="dark"] .border-success-200 {
+        border-color: rgba(34, 197, 94, 0.2);
+    }
+
+    [data-theme="dark"] .text-success-600 {
+        color: var(--success-400);
+    }
+
+    [data-theme="dark"] .text-success-700 {
+        color: var(--success-300);
     }
 </style>
 

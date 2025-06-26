@@ -28,7 +28,7 @@ class BannerCache {
             cache_key VARCHAR(255) NOT NULL,
             file_path VARCHAR(500) NOT NULL,
             original_name VARCHAR(255) NOT NULL,
-            banner_type ENUM('football_1', 'football_2', 'football_3') NOT NULL,
+            banner_type ENUM('football_1', 'football_2', 'football_3', 'movie_1', 'movie_2', 'movie_3') NOT NULL,
             grupo_index INT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             expires_at TIMESTAMP NOT NULL,
@@ -40,7 +40,11 @@ class BannerCache {
         );
         ";
         
-        $this->db->exec($sql);
+        try {
+            $this->db->exec($sql);
+        } catch (PDOException $e) {
+            error_log("Erro ao criar tabela de cache: " . $e->getMessage());
+        }
     }
     
     /**
@@ -175,10 +179,14 @@ class BannerCache {
             $stmt->execute();
             $expiredFiles = $stmt->fetchAll();
             
+            $removedCount = 0;
+            
             // Remover arquivos físicos
             foreach ($expiredFiles as $file) {
                 if (file_exists($file['file_path'])) {
-                    unlink($file['file_path']);
+                    if (unlink($file['file_path'])) {
+                        $removedCount++;
+                    }
                 }
             }
             
@@ -189,7 +197,7 @@ class BannerCache {
             ");
             $stmt->execute();
             
-            return $stmt->rowCount();
+            return $removedCount;
         } catch (Exception $e) {
             error_log("Erro ao limpar cache: " . $e->getMessage());
             return 0;
@@ -197,22 +205,30 @@ class BannerCache {
     }
     
     /**
-     * Limpar todo cache de um usuário
+     * 🔥 LIMPAR TODO CACHE DE UM USUÁRIO (INVALIDAÇÃO AUTOMÁTICA)
      */
     public function clearUserCache($userId) {
         try {
+            // Log para debug
+            error_log("🔥 INVALIDANDO CACHE para usuário ID: " . $userId);
+            
             // Buscar arquivos do usuário
             $stmt = $this->db->prepare("
-                SELECT file_path FROM banner_cache 
+                SELECT file_path, cache_key FROM banner_cache 
                 WHERE user_id = ?
             ");
             $stmt->execute([$userId]);
             $userFiles = $stmt->fetchAll();
             
+            $removedCount = 0;
+            
             // Remover arquivos físicos
             foreach ($userFiles as $file) {
                 if (file_exists($file['file_path'])) {
-                    unlink($file['file_path']);
+                    if (unlink($file['file_path'])) {
+                        $removedCount++;
+                        error_log("🗑️ Arquivo removido: " . $file['file_path']);
+                    }
                 }
             }
             
@@ -222,10 +238,13 @@ class BannerCache {
                 WHERE user_id = ?
             ");
             $stmt->execute([$userId]);
+            $dbRemovedCount = $stmt->rowCount();
             
-            return $stmt->rowCount();
+            error_log("✅ Cache limpo - Arquivos: {$removedCount}, Registros DB: {$dbRemovedCount}");
+            
+            return $removedCount;
         } catch (Exception $e) {
-            error_log("Erro ao limpar cache do usuário: " . $e->getMessage());
+            error_log("❌ Erro ao limpar cache do usuário: " . $e->getMessage());
             return 0;
         }
     }
