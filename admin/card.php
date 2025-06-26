@@ -7,8 +7,10 @@ if (!isset($_SESSION["usuario"])) {
 
 // Incluir classes necessárias
 require_once 'classes/UserImage.php';
+require_once 'classes/BannerCache.php';
 
 $userImage = new UserImage();
+$bannerCache = new BannerCache();
 $userId = $_SESSION['user_id'];
 
 $card_types = [
@@ -48,7 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
                 if (move_uploaded_file($file['tmp_name'], $destination)) {
                     $imagePath = "fzstore/card/" . $fileName;
                     if ($userImage->saveUserImage($userId, $posted_card_type, $imagePath, 'file')) {
-                        $successMessage = "Card atualizado com sucesso!";
+                        // 🔥 INVALIDAR CACHE AUTOMATICAMENTE
+                        $bannerCache->clearUserCache($userId);
+                        
+                        $successMessage = "Card atualizado com sucesso! Cache de banners limpo automaticamente.";
                     } else {
                         $errorMessage = "Erro ao salvar as informações do card.";
                     }
@@ -62,7 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
             $imageUrl = filter_var($_POST['image-url'], FILTER_SANITIZE_URL);
             if (filter_var($imageUrl, FILTER_VALIDATE_URL)) {
                 if ($userImage->saveUserImage($userId, $posted_card_type, $imageUrl, 'url')) {
-                    $successMessage = "Card atualizado com sucesso!";
+                    // 🔥 INVALIDAR CACHE AUTOMATICAMENTE
+                    $bannerCache->clearUserCache($userId);
+                    
+                    $successMessage = "Card atualizado com sucesso! Cache de banners limpo automaticamente.";
                 } else {
                     $errorMessage = "Erro ao salvar as informações do card.";
                 }
@@ -73,6 +81,33 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
     } else {
         $errorMessage = "Tipo de card inválido enviado.";
     }
+    
+    // Redirecionar após POST para evitar reenvio
+    if (!empty($successMessage) || !empty($errorMessage)) {
+        $message = !empty($successMessage) ? $successMessage : $errorMessage;
+        $type = !empty($successMessage) ? 'success' : 'error';
+        
+        // Usar sessão para passar a mensagem
+        $_SESSION['flash_message'] = $message;
+        $_SESSION['flash_type'] = $type;
+        
+        // Redirecionar para a mesma página (GET)
+        header("Location: card.php?tipo=" . $redirect_card_key);
+        exit();
+    }
+}
+
+// Verificar se há mensagem flash da sessão
+if (isset($_SESSION['flash_message'])) {
+    if ($_SESSION['flash_type'] === 'success') {
+        $successMessage = $_SESSION['flash_message'];
+    } else {
+        $errorMessage = $_SESSION['flash_message'];
+    }
+    
+    // Limpar mensagem da sessão
+    unset($_SESSION['flash_message']);
+    unset($_SESSION['flash_type']);
 }
 
 // Buscar configuração atual do card
@@ -204,6 +239,30 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- Cache Info Alert -->
+<?php if (!empty($successMessage) && strpos($successMessage, 'Cache') !== false): ?>
+<div class="card mt-6 border-success-200">
+    <div class="card-header">
+        <h3 class="card-title text-success-600">
+            <i class="fas fa-rocket text-success-500 mr-2"></i>
+            Cache Atualizado Automaticamente
+        </h3>
+    </div>
+    <div class="card-body">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-info-circle text-success-500 mt-1"></i>
+            <div>
+                <p class="font-medium text-success-700">Seus próximos banners usarão o novo card!</p>
+                <p class="text-sm text-success-600 mt-1">
+                    O cache foi limpo automaticamente. Os próximos banners de futebol que você gerar 
+                    já utilizarão o card atualizado.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <style>
     .preview-container {
         margin-top: 1.5rem;
@@ -303,6 +362,26 @@ include "includes/header.php";
         margin-top: 0.25rem;
     }
 
+    .border-success-200 {
+        border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    .text-success-600 {
+        color: var(--success-600);
+    }
+
+    .text-success-700 {
+        color: var(--success-700);
+    }
+
+    .mt-6 {
+        margin-top: 1.5rem;
+    }
+
+    .mt-1 {
+        margin-top: 0.25rem;
+    }
+
     @keyframes fadeIn {
         from {
             opacity: 0;
@@ -325,6 +404,18 @@ include "includes/header.php";
 
     [data-theme="dark"] .text-gray-500 {
         color: var(--text-muted);
+    }
+
+    [data-theme="dark"] .border-success-200 {
+        border-color: rgba(34, 197, 94, 0.2);
+    }
+
+    [data-theme="dark"] .text-success-600 {
+        color: var(--success-400);
+    }
+
+    [data-theme="dark"] .text-success-700 {
+        color: var(--success-300);
     }
 </style>
 
@@ -363,8 +454,6 @@ document.addEventListener('DOMContentLoaded', function() {
         background: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
         color: document.body.getAttribute('data-theme') === 'dark' ? '#f1f5f9' : '#1e293b',
         confirmButtonColor: '#3b82f6'
-    }).then(() => {
-        window.location.href = window.location.pathname + '?tipo=<?= $redirect_card_key ?>';
     });
     <?php elseif (!empty($errorMessage)): ?>
     Swal.fire({
