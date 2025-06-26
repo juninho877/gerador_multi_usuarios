@@ -16,6 +16,7 @@ if (!isset($_SESSION["usuario"])) {
 
 require_once 'includes/banner_functions.php';
 require_once 'classes/BannerStats.php';
+require_once 'classes/BannerCache.php';
 
 function gerarBanner($im, $jogos, $grupoJogos, $padding, $heightPorJogo, $width, $preto, $branco, $fontLiga) {
     static $fundoJogo = null;
@@ -153,10 +154,34 @@ $padding = 15;
 $espacoExtra = 200;
 $fontLiga = __DIR__ . '/fonts/MANDATOR.ttf';
 
+// Inicializar cache
+$bannerCache = new BannerCache();
+$userId = $_SESSION['user_id'];
+
 if (isset($_GET['download_all']) && $_GET['download_all'] == 1) {
     // Registrar estatística para download de todos os banners
     $bannerStats = new BannerStats();
-    $bannerStats->recordBannerGeneration($_SESSION['user_id'], 'football', 'tema2_all', 'Banners Futebol V2 - Todos');
+    $bannerStats->recordBannerGeneration($userId, 'football', 'tema2_all', 'Banners Futebol V2 - Todos');
+    
+    // Gerar chave de cache para todos os banners
+    $allBannersCacheKey = $bannerCache->generateCacheKey($userId, 'football_2_all', 'all', $jogos);
+    
+    // Verificar se existe cache válido para o ZIP
+    $cachedZip = $bannerCache->getCachedBanner($userId, $allBannersCacheKey);
+    
+    if ($cachedZip && file_exists($cachedZip['file_path'])) {
+        // Servir ZIP do cache
+        if (ob_get_level()) ob_end_clean();
+        
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $cachedZip['original_name'] . '"');
+        header('Content-Length: ' . filesize($cachedZip['file_path']));
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        readfile($cachedZip['file_path']);
+        exit;
+    }
     
     $zip = new ZipArchive();
     $zipNome = "banners_Top_V3_" . date('Y-m-d') . ".zip";
@@ -168,28 +193,39 @@ if (isset($_GET['download_all']) && $_GET['download_all'] == 1) {
             $numJogosNesteBanner = count($grupoJogos);
             $height = max($numJogosNesteBanner * $heightPorJogo + $padding * 2 + $espacoExtra, 1015);
 
-            $im = imagecreatetruecolor($width, $height);
-            $preto = imagecolorallocate($im, 0, 0, 0);
-            $branco = imagecolorallocate($im, 255, 255, 255);
+            // Verificar cache individual primeiro
+            $cacheKey = $bannerCache->generateCacheKey($userId, 'football_2', $index, array_intersect_key($jogos, array_flip($grupoJogos)));
+            $cachedBanner = $bannerCache->getCachedBanner($userId, $cacheKey);
             
-            // Carregar fundo do usuário
-            $userId = $_SESSION['user_id'];
-            $fundo = loadUserImage($userId, 'background_banner_2');
-            if ($fundo) {
-                imagecopyresampled($im, $fundo, 0, 0, 0, 0, $width, $height, imagesx($fundo), imagesy($fundo));
-                imagedestroy($fundo);
+            if ($cachedBanner && file_exists($cachedBanner['file_path'])) {
+                // Usar banner do cache
+                $zip->addFile($cachedBanner['file_path'], 'banner_V3_parte_' . ($index + 1) . '.png');
             } else {
-                imagefill($im, 0, 0, $branco);
-            }
+                $im = imagecreatetruecolor($width, $height);
+                $preto = imagecolorallocate($im, 0, 0, 0);
+                $branco = imagecolorallocate($im, 255, 255, 255);
+                
+                // Carregar fundo do usuário
+                $fundo = loadUserImage($userId, 'background_banner_2');
+                if ($fundo) {
+                    imagecopyresampled($im, $fundo, 0, 0, 0, 0, $width, $height, imagesx($fundo), imagesy($fundo));
+                    imagedestroy($fundo);
+                } else {
+                    imagefill($im, 0, 0, $branco);
+                }
 
-            gerarBanner($im, $jogos, $grupoJogos, $padding, $heightPorJogo, $width, $preto, $branco, $fontLiga);
-            
-            $nomeArquivoTemp = sys_get_temp_dir() . '/banner_V3_parte_' . uniqid() . '.png';
-            imagepng($im, $nomeArquivoTemp);
-            
-            $zip->addFile($nomeArquivoTemp, 'banner_V3_parte_' . ($index + 1) . '.png');
-            $tempFiles[] = $nomeArquivoTemp;
-            imagedestroy($im);
+                gerarBanner($im, $jogos, $grupoJogos, $padding, $heightPorJogo, $width, $preto, $branco, $fontLiga);
+                
+                // Salvar no cache
+                $bannerCache->saveBannerToCache($userId, $cacheKey, $im, 'football_2', $index);
+                
+                $nomeArquivoTemp = sys_get_temp_dir() . '/banner_V3_parte_' . uniqid() . '.png';
+                imagepng($im, $nomeArquivoTemp);
+                
+                $zip->addFile($nomeArquivoTemp, 'banner_V3_parte_' . ($index + 1) . '.png');
+                $tempFiles[] = $nomeArquivoTemp;
+                imagedestroy($im);
+            }
         }
         $zip->close();
 
@@ -223,11 +259,23 @@ if (!isset($gruposDeJogos[$grupoIndex])) {
     imagepng($im); imagedestroy($im); exit;
 }
 
-// Registrar estatística para banner individual
-$bannerStats = new BannerStats();
-$bannerStats->recordBannerGeneration($_SESSION['user_id'], 'football', 'tema2', 'Banner Futebol V2 - Parte ' . ($grupoIndex + 1));
-
 $grupoJogos = $gruposDeJogos[$grupoIndex];
+
+// Gerar chave de cache
+$jogosDoGrupo = array_intersect_key($jogos, array_flip($grupoJogos));
+$cacheKey = $bannerCache->generateCacheKey($userId, 'football_2', $grupoIndex, $jogosDoGrupo);
+
+// Verificar cache
+$cachedBanner = $bannerCache->getCachedBanner($userId, $cacheKey);
+
+if ($cachedBanner && file_exists($cachedBanner['file_path'])) {
+    // Servir do cache
+    $download = isset($_GET['download']) && $_GET['download'] == 1;
+    $bannerCache->serveCachedFile($cachedBanner['file_path'], $cachedBanner['original_name'], $download);
+    exit;
+}
+
+// Gerar banner se não estiver em cache
 $numJogosNesteBanner = count($grupoJogos);
 $height = max($numJogosNesteBanner * $heightPorJogo + $padding * 2 + $espacoExtra, 1015);
 
@@ -236,7 +284,6 @@ $preto = imagecolorallocate($im, 0, 0, 0);
 $branco = imagecolorallocate($im, 255, 255, 255);
 
 // Carregar fundo do usuário
-$userId = $_SESSION['user_id'];
 $fundo = loadUserImage($userId, 'background_banner_2');
 if ($fundo) {
     imagecopyresampled($im, $fundo, 0, 0, 0, 0, $width, $height, imagesx($fundo), imagesy($fundo));
@@ -247,9 +294,16 @@ if ($fundo) {
 
 gerarBanner($im, $jogos, $grupoJogos, $padding, $heightPorJogo, $width, $preto, $branco, $fontLiga);
 
+// Registrar estatística para banner individual
+$bannerStats = new BannerStats();
+$bannerStats->recordBannerGeneration($userId, 'football', 'tema2', 'Banner Futebol V2 - Parte ' . ($grupoIndex + 1));
+
+// Salvar no cache
+$originalName = "banner_V3_" . date('Y-m-d') . "_parte" . ($grupoIndex + 1) . ".png";
+$bannerCache->saveBannerToCache($userId, $cacheKey, $im, 'football_2', $grupoIndex, $originalName);
+
 if (isset($_GET['download']) && $_GET['download'] == 1) {
-    $nomeArquivo = "banner_V3_" . date('Y-m-d') . "_parte" . ($grupoIndex + 1) . ".png";
-    header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
+    header('Content-Disposition: attachment; filename="' . $originalName . '"');
 }
 
 header('Content-Type: image/png');
