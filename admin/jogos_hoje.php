@@ -1,5 +1,6 @@
 <?php
 session_start();
+date_default_timezone_set('America/Sao_Paulo');
 if (!isset($_SESSION["usuario"])) {
     header("Location: login.php");
     exit();
@@ -12,6 +13,86 @@ require_once 'includes/banner_functions.php';
 $jogos = obterJogosDeHoje();
 $totalJogosHoje = count($jogos);
 
+// Função para determinar o status do jogo
+function getGameStatus($jogo) {
+    $status = $jogo['status'] ?? '';
+    $horario = $jogo['horario'] ?? '';
+    
+    // Se tem status específico na API, usar ele
+    if (!empty($status)) {
+        switch (strtoupper($status)) {
+            case 'ADIADO':
+                return ['text' => 'ADIADO', 'class' => 'status-postponed', 'icon' => 'fa-pause'];
+            case 'CANCELADO':
+                return ['text' => 'CANCELADO', 'class' => 'status-cancelled', 'icon' => 'fa-times'];
+            case 'FINALIZADO':
+                return ['text' => 'FINALIZADO', 'class' => 'status-finished', 'icon' => 'fa-flag-checkered'];
+            case 'AO_VIVO':
+            case 'LIVE':
+                return ['text' => 'AO VIVO', 'class' => 'status-live', 'icon' => 'fa-circle'];
+            case 'INTERVALO':
+                return ['text' => 'INTERVALO', 'class' => 'status-halftime', 'icon' => 'fa-pause-circle'];
+        }
+    }
+    
+    // Se não tem status específico, determinar baseado no horário
+    if (!empty($horario)) {
+        $agora = new DateTime();
+        $horaJogo = DateTime::createFromFormat('H:i', $horario);
+        
+        if ($horaJogo) {
+            $horaJogo->setDate($agora->format('Y'), $agora->format('m'), $agora->format('d'));
+            
+            $diffMinutos = ($agora->getTimestamp() - $horaJogo->getTimestamp()) / 60;
+            
+            if ($diffMinutos < -30) {
+                return ['text' => 'AGENDADO', 'class' => 'status-scheduled', 'icon' => 'fa-clock'];
+            } elseif ($diffMinutos >= -30 && $diffMinutos < 0) {
+                return ['text' => 'EM BREVE', 'class' => 'status-soon', 'icon' => 'fa-hourglass-half'];
+            } elseif ($diffMinutos >= 0 && $diffMinutos < 120) {
+                return ['text' => 'AO VIVO', 'class' => 'status-live', 'icon' => 'fa-circle'];
+            } else {
+                return ['text' => 'FINALIZADO', 'class' => 'status-finished', 'icon' => 'fa-flag-checkered'];
+            }
+        }
+    }
+    
+    return ['text' => 'AGENDADO', 'class' => 'status-scheduled', 'icon' => 'fa-clock'];
+}
+
+// Função para encontrar o próximo jogo
+function getNextGame($jogos) {
+    $agora = new DateTime();
+    $proximoJogo = null;
+    $menorDiferenca = PHP_INT_MAX;
+    
+    foreach ($jogos as $jogo) {
+        $horario = $jogo['horario'] ?? '';
+        $status = $jogo['status'] ?? '';
+        
+        // Pular jogos adiados, cancelados ou finalizados
+        if (in_array(strtoupper($status), ['ADIADO', 'CANCELADO', 'FINALIZADO'])) {
+            continue;
+        }
+        
+        if (!empty($horario)) {
+            $horaJogo = DateTime::createFromFormat('H:i', $horario);
+            if ($horaJogo) {
+                $horaJogo->setDate($agora->format('Y'), $agora->format('m'), $agora->format('d'));
+                
+                // Se o jogo é no futuro
+                $diferenca = $horaJogo->getTimestamp() - $agora->getTimestamp();
+                if ($diferenca > 0 && $diferenca < $menorDiferenca) {
+                    $menorDiferenca = $diferenca;
+                    $proximoJogo = $jogo;
+                }
+            }
+        }
+    }
+    
+    return $proximoJogo;
+}
+
 $pageTitle = "Jogos de Hoje";
 include "includes/header.php";
 ?>
@@ -23,7 +104,7 @@ include "includes/header.php";
     </h1>
     <p class="page-subtitle">
         <?php if ($totalJogosHoje > 0): ?>
-            <?php echo $totalJogosHoje; ?> jogos disponíveis para gerar banners
+            <?php echo $totalJogosHoje; ?> jogos disponíveis - Atualizado em <?php echo date('H:i'); ?>
         <?php else: ?>
             Nenhum jogo programado para hoje
         <?php endif; ?>
@@ -71,8 +152,8 @@ include "includes/header.php";
         // Calcular estatísticas dos jogos
         $ligas = [];
         $jogosComCanais = 0;
-        $proximoJogo = null;
-        $proximoHorario = null;
+        $jogosAoVivo = 0;
+        $proximoJogo = getNextGame($jogos);
 
         foreach ($jogos as $jogo) {
             $liga = $jogo['competicao'] ?? 'Liga';
@@ -82,9 +163,9 @@ include "includes/header.php";
                 $jogosComCanais++;
             }
             
-            if ($jogo['horario'] && (!$proximoHorario || $jogo['horario'] < $proximoHorario)) {
-                $proximoHorario = $jogo['horario'];
-                $proximoJogo = $jogo;
+            $status = getGameStatus($jogo);
+            if ($status['class'] === 'status-live') {
+                $jogosAoVivo++;
             }
         }
         
@@ -115,16 +196,16 @@ include "includes/header.php";
             <div class="card-body">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-medium text-muted">Com Transmissão</p>
-                        <p class="text-2xl font-bold text-warning-500"><?php echo $jogosComCanais; ?></p>
+                        <p class="text-sm font-medium text-muted">Jogos ao Vivo</p>
+                        <p class="text-2xl font-bold text-danger-500"><?php echo $jogosAoVivo; ?></p>
                     </div>
-                    <div class="w-12 h-12 bg-warning-50 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-tv text-warning-500"></i>
+                    <div class="w-12 h-12 bg-danger-50 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-circle text-danger-500 live-pulse"></i>
                     </div>
                 </div>
                 <div class="mt-2">
-                    <span class="text-xs text-warning-600 font-medium">
-                        <?php echo round(($jogosComCanais / $totalJogosHoje) * 100); ?>% dos jogos
+                    <span class="text-xs text-danger-600 font-medium">
+                        <?php echo $jogosComCanais; ?> com transmissão
                     </span>
                 </div>
             </div>
@@ -135,7 +216,7 @@ include "includes/header.php";
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-muted">Próximo Jogo</p>
-                        <p class="text-2xl font-bold text-info-500"><?php echo $proximoHorario ?? '--:--'; ?></p>
+                        <p class="text-2xl font-bold text-info-500"><?php echo $proximoJogo ? $proximoJogo['horario'] : '--:--'; ?></p>
                     </div>
                     <div class="w-12 h-12 bg-info-50 rounded-lg flex items-center justify-center">
                         <i class="fas fa-clock text-info-500"></i>
@@ -147,6 +228,12 @@ include "includes/header.php";
                         <?php echo htmlspecialchars(substr($proximoJogo['time1'] . ' vs ' . $proximoJogo['time2'], 0, 20)); ?>
                     </span>
                 </div>
+                <?php else: ?>
+                <div class="mt-2">
+                    <span class="text-xs text-muted font-medium">
+                        Nenhum jogo pendente
+                    </span>
+                </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -156,7 +243,7 @@ include "includes/header.php";
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Todos os Jogos de Hoje</h3>
-            <p class="card-subtitle">Clique em qualquer jogo para gerar banners</p>
+            <p class="card-subtitle">Acompanhe o status em tempo real de cada partida</p>
         </div>
         <div class="card-body">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -167,17 +254,19 @@ include "includes/header.php";
                     $hora = $jogo['horario'] ?? '';
                     $canais = $jogo['canais'] ?? [];
                     $temCanais = !empty($canais);
+                    $placar1 = $jogo['placar_time1'] ?? '';
+                    $placar2 = $jogo['placar_time2'] ?? '';
+                    $temPlacar = !empty($placar1) || !empty($placar2);
+                    $status = getGameStatus($jogo);
                 ?>
-                    <div class="game-card-detailed" onclick="goToFutBanner()">
+                    <div class="game-card-detailed">
                         <div class="game-header-detailed">
                             <div class="league-info">
                                 <span class="league-name-detailed"><?php echo htmlspecialchars($liga); ?></span>
-                                <?php if ($temCanais): ?>
-                                    <span class="live-indicator">
-                                        <i class="fas fa-tv"></i>
-                                        AO VIVO
-                                    </span>
-                                <?php endif; ?>
+                                <span class="game-status <?php echo $status['class']; ?>">
+                                    <i class="fas <?php echo $status['icon']; ?>"></i>
+                                    <?php echo $status['text']; ?>
+                                </span>
                             </div>
                             <span class="game-time-detailed"><?php echo htmlspecialchars($hora); ?></span>
                         </div>
@@ -185,10 +274,24 @@ include "includes/header.php";
                         <div class="game-teams-detailed">
                             <div class="team-detailed">
                                 <span class="team-name-detailed"><?php echo htmlspecialchars($time1); ?></span>
+                                <?php if ($temPlacar): ?>
+                                    <span class="team-score"><?php echo htmlspecialchars($placar1 ?: '0'); ?></span>
+                                <?php endif; ?>
                             </div>
-                            <div class="vs-detailed">VS</div>
+                            
+                            <div class="vs-detailed">
+                                <?php if ($temPlacar): ?>
+                                    <span class="score-separator">×</span>
+                                <?php else: ?>
+                                    VS
+                                <?php endif; ?>
+                            </div>
+                            
                             <div class="team-detailed">
                                 <span class="team-name-detailed"><?php echo htmlspecialchars($time2); ?></span>
+                                <?php if ($temPlacar): ?>
+                                    <span class="team-score"><?php echo htmlspecialchars($placar2 ?: '0'); ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -207,13 +310,6 @@ include "includes/header.php";
                             </div>
                         </div>
                         <?php endif; ?>
-
-                        <div class="game-actions">
-                            <button class="btn-generate">
-                                <i class="fas fa-magic"></i>
-                                Gerar Banner
-                            </button>
-                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -258,32 +354,15 @@ include "includes/header.php";
         border-radius: var(--border-radius);
         padding: 1.25rem;
         transition: var(--transition);
-        cursor: pointer;
         position: relative;
         overflow: hidden;
     }
 
     .game-card-detailed:hover {
         background: var(--bg-tertiary);
-        transform: translateY(-4px);
+        transform: translateY(-2px);
         box-shadow: var(--shadow-lg);
         border-color: var(--primary-500);
-    }
-
-    .game-card-detailed::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, var(--primary-500), var(--success-500));
-        opacity: 0;
-        transition: var(--transition);
-    }
-
-    .game-card-detailed:hover::before {
-        opacity: 1;
     }
 
     .game-header-detailed {
@@ -306,20 +385,63 @@ include "includes/header.php";
         text-transform: uppercase;
         letter-spacing: 0.05em;
         display: block;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.5rem;
     }
 
-    .live-indicator {
+    /* Status dos jogos */
+    .game-status {
         font-size: 0.625rem;
         font-weight: 600;
-        color: var(--danger-600);
-        background: var(--danger-50);
-        padding: 0.125rem 0.375rem;
+        padding: 0.25rem 0.5rem;
         border-radius: 4px;
         display: inline-flex;
         align-items: center;
         gap: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+    }
+
+    .status-live {
+        color: var(--danger-600);
+        background: var(--danger-50);
+        border: 1px solid var(--danger-200);
         animation: pulse 2s infinite;
+    }
+
+    .status-scheduled {
+        color: var(--primary-600);
+        background: var(--primary-50);
+        border: 1px solid var(--primary-200);
+    }
+
+    .status-soon {
+        color: var(--warning-600);
+        background: var(--warning-50);
+        border: 1px solid var(--warning-200);
+    }
+
+    .status-finished {
+        color: var(--text-muted);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+    }
+
+    .status-postponed {
+        color: var(--warning-600);
+        background: var(--warning-50);
+        border: 1px solid var(--warning-200);
+    }
+
+    .status-cancelled {
+        color: var(--danger-600);
+        background: var(--danger-50);
+        border: 1px solid var(--danger-200);
+    }
+
+    .status-halftime {
+        color: var(--info-600);
+        background: var(--info-50);
+        border: 1px solid var(--info-200);
     }
 
     .game-time-detailed {
@@ -344,6 +466,10 @@ include "includes/header.php";
         flex: 1;
         text-align: center;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
     }
 
     .team-name-detailed {
@@ -353,6 +479,17 @@ include "includes/header.php";
         display: block;
         word-wrap: break-word;
         line-height: 1.2;
+    }
+
+    .team-score {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--primary-600);
+        background: var(--primary-50);
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--border-radius-sm);
+        min-width: 2rem;
+        text-align: center;
     }
 
     .vs-detailed {
@@ -370,8 +507,13 @@ include "includes/header.php";
         border: 2px solid var(--border-color);
     }
 
+    .score-separator {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--primary-600);
+    }
+
     .channels-info {
-        margin-bottom: 1rem;
         padding-top: 0.75rem;
         border-top: 1px solid var(--border-color);
     }
@@ -398,30 +540,29 @@ include "includes/header.php";
         border-color: var(--border-color);
     }
 
-    .game-actions {
-        margin-top: auto;
+    /* Animações */
+    .live-pulse {
+        animation: livePulse 2s infinite;
     }
 
-    .btn-generate {
-        width: 100%;
-        padding: 0.75rem;
-        background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
-        color: white;
-        border: none;
-        border-radius: var(--border-radius-sm);
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: var(--transition);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
+    @keyframes livePulse {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.7;
+            transform: scale(1.1);
+        }
     }
 
-    .btn-generate:hover {
-        background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
-        transform: translateY(-1px);
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
     }
 
     /* Utilitários */
@@ -435,6 +576,18 @@ include "includes/header.php";
 
     .bg-info-50 {
         background-color: var(--info-50);
+    }
+
+    .text-danger-500 {
+        color: var(--danger-500);
+    }
+
+    .text-danger-600 {
+        color: var(--danger-600);
+    }
+
+    .bg-danger-50 {
+        background-color: var(--danger-50);
     }
 
     .text-6xl {
@@ -477,9 +630,45 @@ include "includes/header.php";
         color: var(--primary-400);
     }
 
-    [data-theme="dark"] .live-indicator {
+    [data-theme="dark"] .status-live {
         background: rgba(239, 68, 68, 0.1);
         color: var(--danger-400);
+        border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    [data-theme="dark"] .status-scheduled {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--primary-400);
+        border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    [data-theme="dark"] .status-soon {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--warning-400);
+        border-color: rgba(245, 158, 11, 0.2);
+    }
+
+    [data-theme="dark"] .status-postponed {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--warning-400);
+        border-color: rgba(245, 158, 11, 0.2);
+    }
+
+    [data-theme="dark"] .status-cancelled {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger-400);
+        border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    [data-theme="dark"] .status-halftime {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--info-400);
+        border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    [data-theme="dark"] .team-score {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--primary-400);
     }
 
     [data-theme="dark"] .channel-badge {
@@ -492,7 +681,7 @@ include "includes/header.php";
     @media (max-width: 768px) {
         .game-teams-detailed {
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.75rem;
         }
 
         .vs-detailed {
@@ -507,18 +696,35 @@ include "includes/header.php";
         .team-detailed:last-child {
             order: 3;
         }
+
+        .team-detailed {
+            flex-direction: row;
+            justify-content: space-between;
+            width: 100%;
+        }
     }
 </style>
 
 <script>
-    function goToFutBanner() {
-        window.location.href = 'futbanner.php';
-    }
-
-    // Auto-refresh a cada 5 minutos
+    // Auto-refresh a cada 2 minutos para manter dados atualizados
     setTimeout(() => {
         location.reload();
-    }, 300000); // 5 minutos
+    }, 120000); // 2 minutos
+
+    // Mostrar horário da última atualização
+    document.addEventListener('DOMContentLoaded', function() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('pt-BR', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        // Atualizar subtitle com horário atual se não foi definido no PHP
+        const subtitle = document.querySelector('.page-subtitle');
+        if (subtitle && !subtitle.textContent.includes('Atualizado em')) {
+            subtitle.textContent += ` - Atualizado em ${timeString}`;
+        }
+    });
 </script>
 
 <?php include "includes/footer.php"; ?>
