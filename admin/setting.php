@@ -93,7 +93,10 @@ include "includes/header.php";
 ?>
 
 <div class="page-header">
-    <h1 class="page-title">Configurações da Conta</h1>
+    <h1 class="page-title">
+        <i class="fas fa-cog text-primary-500 mr-3"></i>
+        Configurações da Conta
+    </h1>
     <p class="page-subtitle">Gerencie suas informações de acesso e preferências do sistema</p>
 </div>
 
@@ -262,24 +265,6 @@ include "includes/header.php";
             </div>
         </div>
 
-        <!-- Password Test -->
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">🔍 Teste de Senha</h3>
-            </div>
-            <div class="card-body">
-                <p class="text-sm text-muted mb-3">Use este teste para verificar se sua senha atual está correta:</p>
-                <div class="form-group">
-                    <input type="password" id="testPassword" class="form-input" placeholder="Digite sua senha atual">
-                    <button type="button" class="btn btn-secondary w-full mt-2" onclick="testPassword()">
-                        <i class="fas fa-check"></i>
-                        Testar Senha
-                    </button>
-                </div>
-                <div id="testResult" class="mt-2" style="display: none;"></div>
-            </div>
-        </div>
-
         <!-- Security Tips -->
         <div class="card">
             <div class="card-header">
@@ -408,22 +393,6 @@ include "includes/header.php";
         font-size: 0.75rem;
         font-weight: 500;
     }
-
-    .test-result-success {
-        color: var(--success-600);
-        background: var(--success-50);
-        padding: 0.5rem;
-        border-radius: 6px;
-        font-size: 0.875rem;
-    }
-
-    .test-result-error {
-        color: var(--danger-600);
-        background: var(--danger-50);
-        padding: 0.5rem;
-        border-radius: 6px;
-        font-size: 0.875rem;
-    }
     
     [data-theme="dark"] .alert-success {
         background: rgba(34, 197, 94, 0.1);
@@ -437,16 +406,6 @@ include "includes/header.php";
     
     [data-theme="dark"] .border-gray-200 {
         border-color: var(--border-color);
-    }
-
-    [data-theme="dark"] .test-result-success {
-        background: rgba(34, 197, 94, 0.1);
-        color: var(--success-400);
-    }
-
-    [data-theme="dark"] .test-result-error {
-        background: rgba(239, 68, 68, 0.1);
-        color: var(--danger-400);
     }
 </style>
 
@@ -562,42 +521,6 @@ function resetForm() {
     document.getElementById('settingsForm').reset();
     document.getElementById('passwordStrength').style.display = 'none';
     document.getElementById('passwordMatch').style.display = 'none';
-}
-
-function testPassword() {
-    const testPassword = document.getElementById('testPassword').value;
-    const testResult = document.getElementById('testResult');
-    
-    if (!testPassword) {
-        testResult.innerHTML = '<div class="test-result-error">Digite uma senha para testar</div>';
-        testResult.style.display = 'block';
-        return;
-    }
-    
-    // Fazer uma requisição AJAX para testar a senha
-    fetch('test_password.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'password=' + encodeURIComponent(testPassword)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            testResult.innerHTML = '<div class="test-result-success">✓ Senha correta!</div>';
-        } else {
-            testResult.innerHTML = '<div class="test-result-error">✗ Senha incorreta</div>';
-        }
-        testResult.style.display = 'block';
-        
-        // Limpar o campo após o teste
-        document.getElementById('testPassword').value = '';
-    })
-    .catch(error => {
-        testResult.innerHTML = '<div class="test-result-error">Erro ao testar senha</div>';
-        testResult.style.display = 'block';
-    });
 }
 </script>
 

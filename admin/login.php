@@ -45,12 +45,53 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
+            /* Light Theme */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            
+            /* Brand Colors */
             --primary-50: #eff6ff;
+            --primary-100: #dbeafe;
             --primary-500: #3b82f6;
             --primary-600: #2563eb;
             --primary-700: #1d4ed8;
-            --danger-500: #ef4444;
+            --primary-900: #1e3a8a;
+            
+            /* Status Colors */
+            --success-50: #f0fdf4;
+            --success-500: #22c55e;
+            --success-600: #16a34a;
             --danger-50: #fef2f2;
+            --danger-500: #ef4444;
+            --danger-600: #dc2626;
+            --warning-50: #fffbeb;
+            --warning-500: #f59e0b;
+            --warning-600: #d97706;
+            
+            /* Layout */
+            --border-radius: 12px;
+            --border-radius-sm: 8px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Dark Theme */
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --border-color: #334155;
         }
 
         * {
@@ -62,132 +103,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 1rem;
+            transition: var(--transition);
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         }
 
         .login-container {
             width: 100%;
-            max-width: 400px;
-            background: rgba(255, 255, 255, 0.95);
+            max-width: 420px;
+            background: var(--bg-primary);
             backdrop-filter: blur(20px);
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--shadow-xl);
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid var(--border-color);
+            animation: slideIn 0.6s ease-out;
         }
 
         .login-header {
             background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
-            padding: 2rem;
+            padding: 3rem 2rem 2rem;
             text-align: center;
             color: white;
-        }
-
-        .logo {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1rem;
-            font-size: 1.5rem;
-        }
-
-        .login-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .login-subtitle {
-            opacity: 0.9;
-            font-size: 0.875rem;
-        }
-
-        .login-form {
-            padding: 2rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
             position: relative;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: #374151;
-            margin-bottom: 0.5rem;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.75rem 1rem 0.75rem 3rem;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            background: #f9fafb;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary-500);
-            background: white;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
-            margin-top: 0.75rem;
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 0.875rem;
-            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
-        }
-
-        .submit-btn:active {
-            transform: translateY(0);
-        }
-
-        .error-message {
-            background: var(--danger-50);
-            color: var(--danger-500);
-            padding: 1rem;
-            border-radius: 12px;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
         }
 
         .theme-toggle {
@@ -201,63 +146,195 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             height: 40px;
             border-radius: 50%;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: var(--transition);
             display: flex;
             align-items: center;
             justify-content: center;
+            backdrop-filter: blur(10px);
         }
 
         .theme-toggle:hover {
             background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
         }
 
-        /* Dark theme */
-        [data-theme="dark"] body {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            animation: pulse 2s infinite;
         }
 
-        [data-theme="dark"] .login-container {
-            background: rgba(30, 41, 59, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .login-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.025em;
         }
 
-        [data-theme="dark"] .login-form {
-            color: #f1f5f9;
+        .login-subtitle {
+            opacity: 0.9;
+            font-size: 1rem;
+            font-weight: 400;
         }
 
-        [data-theme="dark"] .form-label {
-            color: #cbd5e1;
+        .login-form {
+            padding: 2.5rem 2rem;
         }
 
-        [data-theme="dark"] .form-input {
-            background: rgba(15, 23, 42, 0.5);
-            border-color: rgba(255, 255, 255, 0.1);
-            color: #f1f5f9;
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
         }
 
-        [data-theme="dark"] .form-input:focus {
-            background: rgba(15, 23, 42, 0.8);
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .form-input:focus {
+            outline: none;
             border-color: var(--primary-500);
+            background: var(--bg-primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            transform: translateY(-1px);
         }
 
-        [data-theme="dark"] .input-icon {
-            color: #64748b;
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            margin-top: 0.875rem;
+            transition: var(--transition);
+        }
+
+        .form-input:focus + .input-icon {
+            color: var(--primary-500);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .submit-btn:hover::before {
+            left: 100%;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            background: var(--danger-50);
+            color: var(--danger-600);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-top: 1.5rem;
+            font-size: 0.875rem;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            animation: shake 0.5s ease-in-out;
+        }
+
+        [data-theme="dark"] .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-400);
+        }
+
+        .welcome-text {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+        }
+
+        .welcome-text h3 {
+            color: var(--text-primary);
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-text p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
         }
 
         /* Animations */
         @keyframes slideIn {
             from {
                 opacity: 0;
-                transform: translateY(30px);
+                transform: translateY(30px) scale(0.95);
             }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
-        }
-
-        .login-container {
-            animation: slideIn 0.6s ease-out;
         }
 
         @keyframes pulse {
@@ -269,72 +346,110 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
 
-        .logo {
-            animation: pulse 2s infinite;
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
 
         /* Responsive */
         @media (max-width: 480px) {
             .login-header,
             .login-form {
-                padding: 1.5rem;
+                padding: 2rem 1.5rem;
+            }
+            
+            .login-title {
+                font-size: 1.75rem;
+            }
+            
+            .logo {
+                width: 70px;
+                height: 70px;
+                font-size: 1.75rem;
             }
         }
 
-        .db-info {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            color: var(--primary-600);
-            padding: 1rem;
-            border-radius: 12px;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        /* Focus states for accessibility */
+        .theme-toggle:focus,
+        .submit-btn:focus {
+            outline: 2px solid rgba(255, 255, 255, 0.5);
+            outline-offset: 2px;
         }
 
-        [data-theme="dark"] .db-info {
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--primary-400);
+        .form-input:focus {
+            outline: none;
+        }
+
+        /* Loading state */
+        .submit-btn.loading {
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        .submit-btn.loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <button class="theme-toggle" id="themeToggle">
-            <i class="fas fa-moon"></i>
-        </button>
-        
         <div class="login-header">
+            <button class="theme-toggle" id="themeToggle">
+                <i class="fas fa-moon"></i>
+            </button>
+            
             <div class="logo">
                 <i class="fas fa-futbol"></i>
             </div>
             <h1 class="login-title">FutBanner</h1>
-            <p class="login-subtitle">Faça login para acessar o painel</p>
+            <p class="login-subtitle">Sistema de Geração de Banners</p>
         </div>
 
         <div class="login-form">
-            <form method="POST" action="login.php">
+            <div class="welcome-text">
+                <h3>Bem-vindo de volta!</h3>
+                <p>Faça login para acessar o painel administrativo</p>
+            </div>
+
+            <form method="POST" action="login.php" id="loginForm">
                 <div class="form-group">
-                    <label for="username" class="form-label">Usuário</label>
+                    <label for="username" class="form-label">
+                        <i class="fas fa-user"></i>
+                        Usuário
+                    </label>
                     <div style="position: relative;">
+                        <input type="text" id="username" name="username" class="form-input" placeholder="Digite seu usuário" required autocomplete="username">
                         <i class="fas fa-user input-icon"></i>
-                        <input type="text" id="username" name="username" class="form-input" placeholder="Digite seu usuário" required>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="password" class="form-label">Senha</label>
+                    <label for="password" class="form-label">
+                        <i class="fas fa-lock"></i>
+                        Senha
+                    </label>
                     <div style="position: relative;">
+                        <input type="password" id="password" name="password" class="form-input" placeholder="Digite sua senha" required autocomplete="current-password">
                         <i class="fas fa-lock input-icon"></i>
-                        <input type="password" id="password" name="password" class="form-input" placeholder="Digite sua senha" required>
                     </div>
                 </div>
 
-                <button type="submit" class="submit-btn">
-                    <i class="fas fa-sign-in-alt" style="margin-right: 0.5rem;"></i>
-                    Entrar
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Entrar no Sistema
                 </button>
 
                 <?php if (isset($erro)): ?>
@@ -371,8 +486,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         }
 
-        // Form animations
+        // Form enhancements
+        const loginForm = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
         const inputs = document.querySelectorAll('.form-input');
+
+        // Input focus animations
         inputs.forEach(input => {
             input.addEventListener('focus', function() {
                 this.parentElement.style.transform = 'scale(1.02)';
@@ -381,6 +500,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             input.addEventListener('blur', function() {
                 this.parentElement.style.transform = 'scale(1)';
             });
+        });
+
+        // Form submission with loading state
+        loginForm.addEventListener('submit', function(e) {
+            submitBtn.classList.add('loading');
+            submitBtn.textContent = 'Entrando...';
+        });
+
+        // Auto-focus on first input
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('username').focus();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Alt + T for theme toggle
+            if (e.altKey && e.key === 't') {
+                e.preventDefault();
+                themeToggle.click();
+            }
         });
     </script>
 </body>
